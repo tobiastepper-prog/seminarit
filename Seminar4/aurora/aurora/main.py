@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+"""
+Docstring pro main
+"""
 
 import csv
 import argparse
@@ -44,27 +47,28 @@ class FilterCriteria:
             min_threat = split_opt(args.min_threat),
             max_threat = split_opt(args.max_threat),
             min_money = split_opt(args.min_money),
-            channel_darknet_only = split_opt(args.channel_darknet_only),
+            channel_darknet_only = args.channel_darknet
         )
 
     def match(self, row: Dict[str, str]) -> bool:
-        if self.country and row.get("country","").upper not in self.country:
+            
+        if self.country and row.get("country","").upper() not in self.country:
             return False
 
-        if self.status and row.get("status","").upper not in self.status:
+        if self.status and row.get("status","").upper() not in self.status:
             return False
 
-        if self.risk_level and row.get("target_risk_level","").upper not in self.risk_level:
+        if self.risk_level and row.get("target_risk_level","").upper() not in self.risk_level:
             return False
 
-        if self.triage and row.get("triage","").upper not in self.triage:
+        if self.triage and row.get("triage","").upper() not in self.triage:
             return False
 
         if self.from_date or self.to_date:
             ts_str = row.get("timestamp_utc")
             if not ts_str:
                 return False
-            ts = datetime.striptime(ts_str, TS_FTM)
+            ts = datetime.striptime(ts_str, TS_FMT)
             if self.from_date and ts.date() < self.from_date():
                 return False
             if self.to_date and ts.date() > self.to_date():
@@ -124,7 +128,7 @@ class DataProcessor:
             if criteria.match(row):
                 result.append(row)
         return result
-    
+
     def sort_rows(self, rows, spec):
         if not spec:
             return rows
@@ -152,7 +156,7 @@ class DataProcessor:
             for row in rows:
                 writer.writerow(row)
     
-    def sumarize(self, rows: List[Dict[str, Any]]):
+    def summarize(self, rows: List[Dict[str, Any]]):
         total = len(rows)
         print(f'Total rows: {total}')
         if total == 0:
@@ -176,7 +180,7 @@ class DataProcessor:
 class AuroraApp:
     def __init__(self, args: argparse.Namespace):
         self.args = args
-        self.criteria = FilterCriteria
+        self.criteria = FilterCriteria.from_args(args)
         self.sort_spec = SortSpec.from_args(args)
         
         self.repo = DataRepository(args.input)
@@ -192,11 +196,18 @@ class AuroraApp:
         if self.sort_spec:
             print(f"Sorting by: {self.sort_spec.columns}, "
                   f"descending={self.sort_spec.descending}")
+            rows = self.processor.sort_rows(rows, self.sort_spec)
 
+        if not self.args.summary_only:
+            print(f"writing output to {self.args.output}")
+            self.processor.write_csv(rows, self.args.output)
+
+        print("Summary:")
+        self.processor.summarize(rows)
         
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Add description.")
+    p = argparse.ArgumentParser(description=__doc__)
 
     p.add_argument('--input', required=True, help="Path to input CSV file")
     p.add_argument('--output', required=True, help="Path to output CSV file")
